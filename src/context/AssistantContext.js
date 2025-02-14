@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import * as openaiService from "../services/openaiService";
 import { threadService } from "../services/threadService";
+import { assistantService } from "../services/assistantService";
 
 const AssistantContext = createContext();
 
@@ -9,12 +10,17 @@ export function AssistantProvider({ children }) {
   const [currentThread, setCurrentThread] = useState(null);
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  const ASSISTANT_ID = process.env.REACT_APP_ASSISTANT_ID;
+  const [assistants, setAssistants] = useState([]);
+  const [selectedAssistant, setSelectedAssistant] = useState(null);
 
   // Load threads from database when component mounts
   useEffect(() => {
     loadAllThreads();
+  }, []);
+
+  // Load assistants on mount
+  useEffect(() => {
+    loadAssistants();
   }, []);
 
   const loadAllThreads = async () => {
@@ -30,16 +36,27 @@ export function AssistantProvider({ children }) {
     }
   };
 
+  const loadAssistants = async () => {
+    try {
+      const data = await assistantService.getAllAssistants();
+      setAssistants(data);
+    } catch (error) {
+      console.error("Error loading assistants:", error);
+    }
+  };
+
   const createNewThread = async () => {
+    if (!selectedAssistant) return;
+
     try {
       setLoading(true);
       // Create thread in OpenAI first
       const newThread = await openaiService.createThread();
 
-      // Then save to database
+      // Then save to database with selected assistant's ID
       const savedThread = await threadService.createThread(
         newThread.id,
-        ASSISTANT_ID
+        selectedAssistant.id
       );
 
       const threadInfo = {
@@ -122,7 +139,7 @@ export function AssistantProvider({ children }) {
   };
 
   const sendMessage = async (content) => {
-    if (!currentThread || !content.trim()) return;
+    if (!currentThread || !content.trim() || !selectedAssistant) return;
 
     try {
       setLoading(true);
@@ -136,11 +153,11 @@ export function AssistantProvider({ children }) {
       console.log("User message sent:", userMessage);
       setMessages((prev) => [...prev, userMessage]);
 
-      // Run the assistant
-      console.log("Running assistant with ID:", ASSISTANT_ID);
+      // Run the assistant with selectedAssistant.id
+      console.log("Running assistant with ID:", selectedAssistant.id);
       const run = await openaiService.runAssistant(
         currentThread.id,
-        ASSISTANT_ID
+        selectedAssistant.id
       );
       console.log("Assistant run created:", run);
 
@@ -260,6 +277,29 @@ export function AssistantProvider({ children }) {
     }
   };
 
+  const createAssistant = async (title, instructions) => {
+    try {
+      setLoading(true);
+      const newAssistant = await assistantService.createAssistant(
+        title,
+        instructions
+      );
+      setAssistants((prev) => [...prev, newAssistant]);
+      return newAssistant;
+    } catch (error) {
+      console.error("Error creating assistant:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectAssistant = (assistant) => {
+    setSelectedAssistant(assistant);
+    setCurrentThread(null);
+    setMessages([]);
+  };
+
   return (
     <AssistantContext.Provider
       value={{
@@ -272,6 +312,10 @@ export function AssistantProvider({ children }) {
         sendMessage,
         deleteThread,
         updateThreadTitle,
+        assistants,
+        selectedAssistant,
+        createAssistant,
+        selectAssistant,
       }}
     >
       {children}
@@ -279,10 +323,10 @@ export function AssistantProvider({ children }) {
   );
 }
 
-export const useAssistant = () => {
+export function useAssistant() {
   const context = useContext(AssistantContext);
   if (!context) {
     throw new Error("useAssistant must be used within an AssistantProvider");
   }
   return context;
-};
+}
