@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Your custom styles below */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
+}
+
+.main-container {
+  @apply flex w-full h-screen bg-gray-50;
+}
+
+.sidebar {
+  @apply w-72 bg-gray-900 h-full overflow-y-auto shadow-xl;
+}
+
+.chat-content {
+  @apply flex-1 flex flex-col bg-white;
+}
+
+.chat-header {
+  @apply h-16 border-b flex items-center px-6 bg-white shadow-sm;
+}
+
+.thread-title {
+  @apply text-lg font-semibold text-gray-800;
+}
+
+.messages-container {
+  @apply flex-1 overflow-y-auto;
+}
+
+.input-container {
+  @apply border-t bg-white p-4;
+}
+
+.welcome-screen {
+  @apply flex-1 flex items-center justify-center;
+}
+
+.welcome-content {
+  @apply text-center;
+}
+
+.welcome-title {
+  @apply text-2xl font-semibold text-gray-800 mb-2;
+}
+
+.welcome-message {
+  @apply text-gray-600;
+}
+
+.messages-list {
+  @apply p-6 space-y-6;
+}
+
+.message-wrapper {
+  @apply flex;
+}
+
+.user-message {
+  @apply justify-end;
+}
+
+.assistant-message {
+  @apply justify-start;
+}
+
+.message-bubble {
+  @apply max-w-2xl px-4 py-3 rounded-2xl shadow-lg;
+}
+
+.user-bubble {
+  @apply bg-blue-600 text-white shadow-blue-100;
+}
+
+.assistant-bubble {
+  @apply bg-gray-100 text-gray-900 shadow-gray-100;
+}
+
+.sender-name {
+  @apply text-sm font-semibold mb-1;
+}
+
+.message-content {
+  @apply text-sm;
+}
+
+.typing-indicator-wrapper {
+  @apply flex justify-start;
+}
+
+.typing-indicator {
+  @apply bg-gray-100 text-gray-900 px-4 py-3 rounded-2xl shadow-lg animate-pulse;
+}
+
+.typing-dots {
+  @apply flex items-center space-x-2;
+}
+
+.dot {
+  @apply w-2 h-2 bg-gray-400 rounded-full animate-bounce;
+}
+
+.dot-2 {
+  @apply delay-100;
+}
+
+.dot-3 {
+  @apply delay-200;
+}
