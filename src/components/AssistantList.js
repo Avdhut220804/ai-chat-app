@@ -7,17 +7,32 @@ function AssistantList() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [selectedModel, setSelectedModel] = useState("");
+
+  // Static list of models
+  const availableModels = [
+    { id: "gpt-4", name: "GPT-4" },
+    { id: "gpt-4-turbo-preview", name: "GPT-4 Turbo" },
+    { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
+  ];
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    if (!selectedModel) return;
+
     try {
-      await createAssistant(newTitle, instructions);
+      await createAssistant(newTitle, instructions, selectedModel);
       setShowCreateForm(false);
-      setNewTitle("");
-      setInstructions("");
+      resetForm();
     } catch (error) {
       console.error("Error creating assistant:", error);
     }
+  };
+
+  const resetForm = () => {
+    setNewTitle("");
+    setInstructions("");
+    setSelectedModel("");
   };
 
   return (
@@ -33,64 +48,71 @@ function AssistantList() {
       </button>
 
       {showCreateForm && (
-        <form
-          onSubmit={handleCreate}
-          className="mb-6 bg-gray-800 p-4 rounded-lg"
-        >
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">
-              Assistant Name
-            </label>
-            <input
-              type="text"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              className="w-full bg-gray-700 text-white px-3 py-2 rounded"
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">
-              Instructions
-            </label>
-            <textarea
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              className="w-full bg-gray-700 text-white px-3 py-2 rounded"
-              rows="3"
-            />
-          </div>
+        <form onSubmit={handleCreate} className="mb-4 space-y-4">
+          <input
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Assistant Title"
+            className="w-full p-2 bg-gray-700 rounded"
+            required
+          />
+
+          <textarea
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+            placeholder="Instructions (optional)"
+            className="w-full p-2 bg-gray-700 rounded"
+            rows={3}
+          />
+
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="w-full p-2 bg-gray-700 rounded"
+            required
+          >
+            <option value="">Select a model</option>
+            {availableModels.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.name}
+              </option>
+            ))}
+          </select>
+
           <div className="flex justify-end space-x-2">
             <button
               type="button"
-              onClick={() => setShowCreateForm(false)}
-              className="px-4 py-2 bg-gray-600 rounded"
+              onClick={() => {
+                setShowCreateForm(false);
+                resetForm();
+              }}
+              className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="px-4 py-2 bg-blue-600 rounded disabled:opacity-50"
+              disabled={loading || !selectedModel}
+              className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500 
+                       disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create
+              {loading ? "Creating..." : "Create"}
             </button>
           </div>
         </form>
       )}
 
+      {/* List of assistants */}
       <div className="space-y-2">
         {assistants.map((assistant) => (
           <div
             key={assistant.id}
             onClick={() => selectAssistant(assistant)}
-            className="p-4 bg-gray-800 hover:bg-gray-700 rounded-lg cursor-pointer 
-                     transition-colors duration-200"
+            className="p-4 bg-gray-800 rounded-lg cursor-pointer 
+                     hover:bg-gray-700 transition-colors duration-200"
           >
-            <h3 className="font-medium">{assistant.title}</h3>
-            <p className="text-sm text-gray-400">
-              Created: {new Date(assistant.createdAt).toLocaleDateString()}
-            </p>
+            <h3 className="text-lg font-medium">{assistant.title}</h3>
           </div>
         ))}
       </div>

@@ -9,9 +9,9 @@ export function AssistantProvider({ children }) {
   const [threads, setThreads] = useState([]);
   const [currentThread, setCurrentThread] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [assistants, setAssistants] = useState([]);
   const [selectedAssistant, setSelectedAssistant] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   // Load threads from database when component mounts
   useEffect(() => {
@@ -300,6 +300,44 @@ export function AssistantProvider({ children }) {
     setMessages([]);
   };
 
+  const uploadFilesToVectorStore = async (files, vectorStoreName) => {
+    if (!selectedAssistant) return;
+
+    try {
+      setLoading(true);
+
+      // First create a vector store
+      const vectorStore = await assistantService.createVectorStore(
+        vectorStoreName
+      );
+
+      // Upload files to the vector store
+      await assistantService.uploadFilesToVectorStore(vectorStore.id, files);
+
+      // Attach vector store to assistant
+      const updatedAssistant =
+        await assistantService.attachVectorStoreToAssistant(
+          selectedAssistant.id,
+          vectorStore.id
+        );
+
+      // Update assistants state
+      setAssistants((prev) =>
+        prev.map((ast) =>
+          ast.id === selectedAssistant.id ? updatedAssistant : ast
+        )
+      );
+
+      // Update selected assistant
+      setSelectedAssistant(updatedAssistant);
+    } catch (error) {
+      console.error("Error processing files:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <AssistantContext.Provider
       value={{
@@ -316,6 +354,7 @@ export function AssistantProvider({ children }) {
         selectedAssistant,
         createAssistant,
         selectAssistant,
+        uploadFilesToVectorStore,
       }}
     >
       {children}
