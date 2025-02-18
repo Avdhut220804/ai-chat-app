@@ -18,6 +18,7 @@ export function AssistantProvider({ children }) {
   const [assistants, setAssistants] = useState([]);
   const [selectedAssistant, setSelectedAssistant] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [editingAssistant, setEditingAssistant] = useState(null);
 
   // Move loadAllThreads inside useCallback to prevent recreation on every render
   const loadAllThreads = useCallback(async () => {
@@ -415,6 +416,44 @@ export function AssistantProvider({ children }) {
     }
   };
 
+  const getAssistantDetails = async (assistantId) => {
+    try {
+      const details = await assistantService.getAssistantDetails(assistantId);
+      return details;
+    } catch (error) {
+      console.error("Error getting assistant details:", error);
+      throw error;
+    }
+  };
+
+  const updateAssistant = async (assistantId, updateData) => {
+    try {
+      setLoading(true);
+      const updatedAssistant = await assistantService.updateAssistant(
+        assistantId,
+        updateData
+      );
+
+      // Update local state
+      setAssistants((prev) =>
+        prev.map((ast) =>
+          ast.id === assistantId ? { ...ast, title: updateData.name } : ast
+        )
+      );
+
+      if (selectedAssistant?.id === assistantId) {
+        setSelectedAssistant((prev) => ({ ...prev, title: updateData.name }));
+      }
+
+      return updatedAssistant;
+    } catch (error) {
+      console.error("Error updating assistant:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <AssistantContext.Provider
       value={{
@@ -435,6 +474,10 @@ export function AssistantProvider({ children }) {
         addFilesToVectorStore,
         deleteFileFromVectorStore,
         deleteAssistant,
+        getAssistantDetails,
+        updateAssistant,
+        editingAssistant,
+        setEditingAssistant,
       }}
     >
       {children}

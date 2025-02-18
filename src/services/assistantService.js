@@ -132,9 +132,13 @@ export const assistantService = {
 
   async attachVectorStoreToAssistant(assistantId, vectorStoreId) {
     try {
-      // Update assistant with file_search tool
+      // Update assistant with correct tool_resources format
       await openai.beta.assistants.update(assistantId, {
-        tools: [{ type: "file_search" }],
+        tool_resources: {
+          file_search: {
+            vector_store_ids: [vectorStoreId],
+          },
+        },
       });
 
       // Update vector store reference in our database
@@ -241,6 +245,35 @@ export const assistantService = {
       return true;
     } catch (error) {
       console.error("Error deleting vector store:", error);
+      throw error;
+    }
+  },
+
+  async getAssistantDetails(assistantId) {
+    try {
+      const assistant = await openai.beta.assistants.retrieve(assistantId);
+      return assistant;
+    } catch (error) {
+      console.error("Error fetching assistant details:", error);
+      throw error;
+    }
+  },
+
+  async updateAssistant(assistantId, updateData) {
+    try {
+      const updatedAssistant = await openai.beta.assistants.update(
+        assistantId,
+        updateData
+      );
+
+      // Update in database
+      await axios.put(`${API_URL}/assistants/${assistantId}`, {
+        title: updateData.name,
+      });
+
+      return updatedAssistant;
+    } catch (error) {
+      console.error("Error updating assistant:", error);
       throw error;
     }
   },
