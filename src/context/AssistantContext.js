@@ -1,4 +1,10 @@
-import React, { createContext, useState, useContext, useEffect } from "react";
+import React, {
+  createContext,
+  useState,
+  useContext,
+  useEffect,
+  useCallback,
+} from "react";
 import * as openaiService from "../services/openaiService";
 import { threadService } from "../services/threadService";
 import { assistantService } from "../services/assistantService";
@@ -13,19 +19,14 @@ export function AssistantProvider({ children }) {
   const [selectedAssistant, setSelectedAssistant] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Load threads from database when component mounts
-  useEffect(() => {
-    loadAllThreads();
-  }, []);
+  // Move loadAllThreads inside useCallback to prevent recreation on every render
+  const loadAllThreads = useCallback(async () => {
+    if (!selectedAssistant) return;
 
-  // Load assistants on mount
-  useEffect(() => {
-    loadAssistants();
-  }, []);
-
-  const loadAllThreads = async () => {
     try {
-      const threadsData = await threadService.getAllThreads();
+      const threadsData = await threadService.getAllThreads(
+        selectedAssistant.id
+      );
       // Sort threads by creation date, newest first
       const sortedThreads = threadsData.sort(
         (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -34,7 +35,21 @@ export function AssistantProvider({ children }) {
     } catch (error) {
       console.error("Error loading threads:", error);
     }
-  };
+  }, [selectedAssistant]); // Add selectedAssistant as dependency
+
+  // Update useEffect to include loadAllThreads in dependencies
+  useEffect(() => {
+    if (selectedAssistant) {
+      loadAllThreads();
+    } else {
+      setThreads([]);
+    }
+  }, [selectedAssistant, loadAllThreads]); // Add both dependencies
+
+  // Load assistants on mount
+  useEffect(() => {
+    loadAssistants();
+  }, []);
 
   const loadAssistants = async () => {
     try {
@@ -96,7 +111,6 @@ export function AssistantProvider({ children }) {
 
         // If thread doesn't exist in OpenAI, remove it from database and state
         if (error.status === 404) {
-          console.log("Thread not found in OpenAI, cleaning up...");
           await threadService.deleteThread(threadId);
           setThreads((prev) => prev.filter((t) => t.id !== threadId));
           setCurrentThread(null);
@@ -143,23 +157,19 @@ export function AssistantProvider({ children }) {
 
     try {
       setLoading(true);
-      console.log("Sending message to thread:", currentThread.id);
 
       // Send user message
       const userMessage = await openaiService.sendMessage(
         currentThread.id,
         content
       );
-      console.log("User message sent:", userMessage);
       setMessages((prev) => [...prev, userMessage]);
 
       // Run the assistant with selectedAssistant.id
-      console.log("Running assistant with ID:", selectedAssistant.id);
       const run = await openaiService.runAssistant(
         currentThread.id,
         selectedAssistant.id
       );
-      console.log("Assistant run created:", run);
 
       let timeoutCounter = 0;
       const maxAttempts = 60; // 60 seconds timeout
@@ -178,14 +188,12 @@ export function AssistantProvider({ children }) {
             currentThread.id,
             run.id
           );
-          console.log("Run status:", runStatus.status);
 
           if (runStatus.status === "completed") {
             clearInterval(checkCompletion);
             const newMessages = await openaiService.getMessages(
               currentThread.id
             );
-            console.log("New messages received:", newMessages);
             setMessages(newMessages.reverse());
             setLoading(false);
           } else if (runStatus.status === "failed") {
@@ -277,12 +285,13 @@ export function AssistantProvider({ children }) {
     }
   };
 
-  const createAssistant = async (title, instructions) => {
+  const createAssistant = async (title, instructions, model) => {
     try {
       setLoading(true);
       const newAssistant = await assistantService.createAssistant(
         title,
-        instructions
+        instructions,
+        model
       );
       setAssistants((prev) => [...prev, newAssistant]);
       return newAssistant;
@@ -300,19 +309,15 @@ export function AssistantProvider({ children }) {
     setMessages([]);
   };
 
-  const uploadFilesToVectorStore = async (files, vectorStoreName) => {
+  const createVectorStoreForAssistant = async (vectorStoreName) => {
     if (!selectedAssistant) return;
 
     try {
       setLoading(true);
-
-      // First create a vector store
+      // Create a vector store
       const vectorStore = await assistantService.createVectorStore(
         vectorStoreName
       );
-
-      // Upload files to the vector store
-      await assistantService.uploadFilesToVectorStore(vectorStore.id, files);
 
       // Attach vector store to assistant
       const updatedAssistant =
@@ -330,8 +335,80 @@ export function AssistantProvider({ children }) {
 
       // Update selected assistant
       setSelectedAssistant(updatedAssistant);
+
+      return vectorStore;
     } catch (error) {
-      console.error("Error processing files:", error);
+      console.error("Error creating vector store:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addFilesToVectorStore = async (vectorStoreId, files) => {
+    try {
+      if (!selectedAssistant?.vectorStore) {
+        throw new Error("No vector store selected");
+      }
+      await assistantService.uploadFilesToVectorStore(vectorStoreId, files);
+
+      // Refresh the assistant to get updated file list
+      const updatedAssistant = await assistantService.getAssistantById(
+        selectedAssistant.id
+      );
+      setSelectedAssistant(updatedAssistant);
+    } catch (error) {
+      console.error("Error uploading files:", error);
+      throw error;
+    }
+  };
+
+  const deleteFileFromVectorStore = async (vectorStoreId, fileId) => {
+    if (!selectedAssistant) return;
+
+    try {
+      setLoading(true);
+      // Delete file from both database and OpenAI
+      await assistantService.deleteFileFromVectorStore(vectorStoreId, fileId);
+
+      // Refresh assistant data to get updated file list
+      const updatedAssistant = await assistantService.getAssistantById(
+        selectedAssistant.id
+      );
+
+      // Update assistants state
+      setAssistants((prev) =>
+        prev.map((ast) =>
+          ast.id === selectedAssistant.id ? updatedAssistant : ast
+        )
+      );
+
+      // Update selected assistant
+      setSelectedAssistant(updatedAssistant);
+    } catch (error) {
+      console.error("Error deleting file:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteAssistant = async (assistantId) => {
+    try {
+      setLoading(true);
+      await assistantService.deleteAssistant(assistantId);
+
+      // Update local state
+      setAssistants((prev) => prev.filter((ast) => ast.id !== assistantId));
+
+      // If the deleted assistant was selected, clear selection
+      if (selectedAssistant?.id === assistantId) {
+        setSelectedAssistant(null);
+        setCurrentThread(null);
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error("Error deleting assistant:", error);
       throw error;
     } finally {
       setLoading(false);
@@ -354,7 +431,10 @@ export function AssistantProvider({ children }) {
         selectedAssistant,
         createAssistant,
         selectAssistant,
-        uploadFilesToVectorStore,
+        createVectorStoreForAssistant,
+        addFilesToVectorStore,
+        deleteFileFromVectorStore,
+        deleteAssistant,
       }}
     >
       {children}

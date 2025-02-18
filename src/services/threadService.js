@@ -16,12 +16,14 @@ export const threadService = {
     }
   },
 
-  async getAllThreads() {
+  async getAllThreads(assistantId) {
     try {
-      const response = await axios.get(`${API_URL}/threads`);
+      const response = await axios.post(`${API_URL}/threads/getAll`, {
+        assistantId,
+      });
       return response.data;
     } catch (error) {
-      console.error("Error getting threads:", error);
+      console.error("Error fetching threads:", error);
       throw error;
     }
   },

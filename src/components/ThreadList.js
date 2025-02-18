@@ -9,123 +9,124 @@ function ThreadList() {
     loadThread,
     deleteThread,
     updateThreadTitle,
+    selectedAssistant,
   } = useAssistant();
   const [editingId, setEditingId] = useState(null);
   const [editTitle, setEditTitle] = useState("");
 
-  const handleEdit = (thread) => {
+  const handleThreadClick = (thread) => {
+    if (currentThread?.id !== thread.id) {
+      loadThread(thread.id);
+    }
+  };
+
+  const handleEdit = (thread, e) => {
+    e.stopPropagation(); // Prevent thread selection when clicking edit
     setEditingId(thread.id);
     setEditTitle(thread.title || `Chat ${thread.id.slice(0, 8)}`);
   };
 
-  const handleSave = (threadId) => {
+  const handleSave = (threadId, e) => {
+    e.stopPropagation(); // Prevent thread selection when saving
     if (editTitle.trim()) {
       updateThreadTitle(threadId, editTitle.trim());
     }
     setEditingId(null);
   };
 
+  // Only show the New Chat button if an assistant is selected
   return (
     <div className="p-4 text-white">
-      <button
-        onClick={createNewThread}
-        className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg mb-6 
-                 transition-colors duration-200 flex items-center justify-center 
-                 shadow-lg hover:shadow-xl"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-5 w-5 mr-2"
-          viewBox="0 0 20 20"
-          fill="currentColor"
+      {selectedAssistant && (
+        <button
+          onClick={createNewThread}
+          className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 
+                   rounded-lg mb-6 transition-all duration-200 flex items-center 
+                   justify-center shadow-lg hover:from-blue-600 hover:to-purple-700"
         >
-          <path
-            fillRule="evenodd"
-            d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-            clipRule="evenodd"
-          />
-        </svg>
-        New Chat
-      </button>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-5 w-5 mr-2"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+          New Chat
+        </button>
+      )}
+
       <div className="space-y-2">
         {threads.map((thread) => (
           <div
             key={thread.id}
-            className={`group relative flex items-center justify-between p-3 ${
-              currentThread?.id === thread.id
-                ? "bg-gray-700"
-                : "hover:bg-gray-800"
-            } rounded-lg transition-all duration-200`}
+            onClick={() => handleThreadClick(thread)}
+            className={`p-4 rounded-lg transition-all duration-200 cursor-pointer
+                     ${
+                       currentThread?.id === thread.id
+                         ? "bg-blue-600"
+                         : "bg-gray-800 hover:bg-gray-700"
+                     }`}
           >
-            <div
-              onClick={() => !editingId && loadThread(thread.id)}
-              className="flex-1 cursor-pointer"
-            >
+            <div className="flex items-center justify-between">
               {editingId === thread.id ? (
                 <input
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  onBlur={() => handleSave(thread.id)}
-                  onKeyPress={(e) => e.key === "Enter" && handleSave(thread.id)}
-                  className="w-full bg-gray-600 text-white px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onBlur={(e) => handleSave(thread.id, e)}
+                  onKeyPress={(e) =>
+                    e.key === "Enter" && handleSave(thread.id, e)
+                  }
+                  className="bg-gray-700 text-white px-2 py-1 rounded w-full"
                   autoFocus
                 />
               ) : (
-                <>
-                  <div className="font-medium">
+                <div className="flex-1 cursor-pointer">
+                  <h3 className="text-lg font-medium">
                     {thread.title || `Chat ${thread.id.slice(0, 8)}`}
-                  </div>
-                </>
+                  </h3>
+                </div>
               )}
-            </div>
-
-            <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100">
-              {/* Edit button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEdit(thread);
-                }}
-                className="p-1 hover:bg-gray-600 rounded text-gray-400 hover:text-gray-300"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              <div className="flex items-center space-x-2 ml-2">
+                <button
+                  onClick={(e) => handleEdit(thread, e)}
+                  className="p-1 hover:bg-gray-600 rounded"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
-              </button>
-
-              {/* Delete button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteThread(thread.id);
-                }}
-                className="p-1 hover:bg-gray-600 rounded text-red-400 hover:text-red-300"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteThread(thread.id);
+                  }}
+                  className="p-1 hover:bg-gray-600 rounded text-red-400 hover:text-red-500"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                  />
-                </svg>
-              </button>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         ))}

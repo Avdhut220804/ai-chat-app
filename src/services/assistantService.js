@@ -91,42 +91,39 @@ export const assistantService = {
 
   async uploadFilesToVectorStore(vectorStoreId, files) {
     try {
-      // Convert files to array if single file
       const fileArray = Array.isArray(files) ? files : [files];
 
       // Upload files to OpenAI
-      const uploadPromises = fileArray.map(async (file) => {
-        const formData = new FormData();
-        formData.append("file", file);
+      const openaiFiles = await Promise.all(
+        fileArray.map(async (file) => {
+          if (!file) throw new Error("File is missing");
 
-        // First upload file to OpenAI
-        const openaiFile = await openai.files.create({
-          file: file,
-          purpose: "assistants",
-        });
+          const openaiFile = await openai.files.create({
+            file: file,
+            purpose: "assistants",
+          });
 
-        // Save file reference in our database
-        await axios.post(`${API_URL}/files`, {
-          fileId: openaiFile.id,
-          filename: file.name,
-          vectorStoreId: vectorStoreId,
-        });
+          // Save reference in database
+          await axios.post(`${API_URL}/files`, {
+            fileId: openaiFile.id,
+            filename: file.name,
+            vectorStoreId: vectorStoreId,
+          });
 
-        return openaiFile;
-      });
+          return openaiFile;
+        })
+      );
+      const file_ids = openaiFiles.map((file) => file.id);
 
-      const uploadedFiles = await Promise.all(uploadPromises);
-
-      // Create file streams for vector store
-      const fileIds = uploadedFiles.map((file) => file.id);
-
-      // Upload files to vector store
-      await openai.beta.vectorStores.fileBatches.uploadAndPoll(
+      // Attach files to vector store
+      const result = await openai.beta.vectorStores.fileBatches.createAndPoll(
         vectorStoreId,
-        fileIds
+        {
+          file_ids: file_ids,
+        }
       );
 
-      return uploadedFiles;
+      return result;
     } catch (error) {
       console.error("Error uploading files to vector store:", error);
       throw error;
@@ -151,6 +148,99 @@ export const assistantService = {
       return response.data;
     } catch (error) {
       console.error("Error attaching vector store to assistant:", error);
+      throw error;
+    }
+  },
+
+  async deleteAssistant(assistantId) {
+    try {
+      // Delete from our database first and get the list of thread IDs
+      const response = await axios.delete(
+        `${API_URL}/assistants/${assistantId}`
+      );
+      const { assistant, threadIds } = response.data;
+
+      // Delete the assistant from OpenAI
+      await openai.beta.assistants.del(assistantId);
+
+      // Delete all threads from OpenAI
+      for (const threadId of threadIds) {
+        try {
+          await openai.beta.threads.del(threadId);
+        } catch (error) {
+          // Log but continue if a thread deletion fails
+          console.warn(
+            `Failed to delete thread ${threadId} from OpenAI:`,
+            error
+          );
+        }
+      }
+
+      return assistant;
+    } catch (error) {
+      console.error("Error deleting assistant:", error);
+      throw error;
+    }
+  },
+
+  async getFilesByVectorStoreId(vectorStoreId) {
+    try {
+      const response = await axios.get(
+        `${API_URL}/files/vectorstore/${vectorStoreId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching files:", error);
+      throw error;
+    }
+  },
+
+  async deleteFileFromVectorStore(vectorStoreId, fileId) {
+    try {
+      // First delete from OpenAI files
+      await openai.files.del(fileId);
+
+      // Then delete from OpenAI vector store
+      try {
+        await openai.beta.vectorStores.files.del(vectorStoreId, fileId);
+      } catch (error) {
+        // If the file is not found in vector store, continue with database deletion
+        console.error(
+          "File not found in vector store, continuing with cleanup..."
+        );
+      }
+
+      // Finally delete from our database
+      const response = await axios.delete(`${API_URL}/files/${fileId}`);
+
+      if (!response.data) {
+        throw new Error("Failed to delete file from database");
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error deleting file from vector store:", error);
+      throw error;
+    }
+  },
+
+  async deleteVectorStore(vectorStoreId) {
+    try {
+      // Delete from OpenAI
+      await openai.beta.vectorStores.del(vectorStoreId);
+
+      // Delete from our database (this will also detach it from assistants)
+      const response = await axios.delete(
+        `${API_URL}/vectorstores/${vectorStoreId}`
+      );
+
+      if (!response.data) {
+        throw new Error("Failed to delete vector store from database");
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error deleting vector store:", error);
       throw error;
     }
   },
