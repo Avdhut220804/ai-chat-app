@@ -32,6 +32,13 @@ export const runAssistant = async (threadId, assistantId) => {
   try {
     const run = await openai.beta.threads.runs.create(threadId, {
       assistant_id: assistantId,
+      additional_instructions: `
+        You must only refer to the information provided in the files attached via the vector store.
+        Do not generate any information that is not explicitly found in the provided files.
+        If you do not find relevant information in the files, clearly state: 
+        "I do not have the required information in my provided data."
+        Do not attempt to answer based on general knowledge or external sources.
+      `,
     });
     return run;
   } catch (error) {
